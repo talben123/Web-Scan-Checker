@@ -3,7 +3,7 @@ import logging
 import requests
 import socket
 import ssl
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -15,8 +15,8 @@ app.secret_key = os.environ.get("SESSION_SECRET", "default_secret_key")
 
 @app.route('/')
 def index():
-    """Render the home page with API documentation"""
-    return render_template('index.html')
+    """Simple home page"""
+    return "<h1>Welcome to the URL Security Scanner API</h1>"
 
 @app.route('/api/scan', methods=['POST'])
 def scan_url():
@@ -146,12 +146,10 @@ def scan_url():
             80: "Port 80 (HTTP) is open — redirect all HTTP traffic to HTTPS to secure user data."
         }
         
-        # Add recommendation for each open port
         for port in open_ports:
             if port in port_recommendations:
                 results["recommendations"].append(port_recommendations[port])
         
-        # Mark critical issues for FTP and SSH ports
         if 21 in open_ports or 22 in open_ports:
             results["risk_summary"]["critical_issues"] += 1
 
@@ -184,4 +182,5 @@ def scan_url():
         }), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port, debug=True)
