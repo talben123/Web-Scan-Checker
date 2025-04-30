@@ -4,6 +4,7 @@ import requests
 import socket
 import ssl
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -11,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all domains
+
 app.secret_key = os.environ.get("SESSION_SECRET", "default_secret_key")
 
 @app.route('/')
@@ -26,10 +29,8 @@ def scan_url():
     Expected JSON input: {"url": "https://example.com"}
     """
     try:
-        # Get the JSON data from the request
         data = request.get_json()
         
-        # Validate input
         if not data or 'url' not in data:
             return jsonify({
                 'status': 'error',
@@ -50,7 +51,7 @@ def scan_url():
             },
             "recommendations": []
         }
-        
+
         # SSL Check
         ssl_valid = False
         ssl_details = ""
@@ -85,7 +86,7 @@ def scan_url():
             "present_headers": []
         }
         try:
-            if hostname:  # Only check if we have a valid hostname
+            if hostname:
                 resp = requests.get(f"https://{hostname}", timeout=5)
                 headers = resp.headers
                 security_headers = ["Strict-Transport-Security", "X-Content-Type-Options", "X-Frame-Options"]
@@ -102,17 +103,13 @@ def scan_url():
         results["issues_found"]["security_headers"] = headers_info
         if len(headers_info["missing_headers"]) > 0:
             results["risk_summary"]["warnings"] += len(headers_info["missing_headers"])
-            
-            # Header recommendations mapping
             header_recommendations = {
                 "Strict-Transport-Security": "Enable HTTPS protection to force browsers to use secure connections and protect users.",
                 "X-Content-Type-Options": "Add this header to prevent browsers from interpreting files incorrectly and protect against attacks.",
                 "X-Frame-Options": "Add this header to prevent clickjacking by disallowing your site to be embedded."
             }
-            
             for h in headers_info["missing_headers"]:
                 if not h.startswith("Cannot verify"):
-                    # Add the detailed recommendation for the missing header
                     if h in header_recommendations:
                         results["recommendations"].append(f"Implement security header: {h} — {header_recommendations[h]}")
                     else:
@@ -121,7 +118,7 @@ def scan_url():
         # Open Ports Scan (Basic)
         open_ports = []
         try:
-            if hostname:  # Only check if we have a valid hostname
+            if hostname:
                 for port in [21, 22, 80, 443]:
                     sock = socket.socket()
                     sock.settimeout(1)
@@ -138,29 +135,26 @@ def scan_url():
         results["issues_found"]["port_scan"] = {
             "open_ports": open_ports
         }
-        
-        # Port recommendations mapping
+
         port_recommendations = {
             21: "Port 21 (FTP) is open — consider closing it if not necessary, to prevent unauthorized file access.",
             22: "Port 22 (SSH) is open — ensure SSH access is restricted or properly secured.",
             80: "Port 80 (HTTP) is open — redirect all HTTP traffic to HTTPS to secure user data."
         }
-        
+
         for port in open_ports:
             if port in port_recommendations:
                 results["recommendations"].append(port_recommendations[port])
-        
+
         if 21 in open_ports or 22 in open_ports:
             results["risk_summary"]["critical_issues"] += 1
 
-        # Safe Browsing Check (Simulated)
         results["issues_found"]["safe_browsing_status"] = {
             "checked": "Simulated Check",
             "unsafe_detected": False
         }
         results["risk_summary"]["info"] += 1
 
-        # Final Assessment
         total_issues = results["risk_summary"]["critical_issues"] + results["risk_summary"]["warnings"]
         if total_issues == 0:
             results["overall_status"] = "Secure"
@@ -171,9 +165,9 @@ def scan_url():
         else:
             results["overall_status"] = "Moderate"
             results["overall_score"] = 70
-            
+
         return jsonify(results)
-            
+
     except Exception as e:
         logger.error(f"General error: {str(e)}")
         return jsonify({
